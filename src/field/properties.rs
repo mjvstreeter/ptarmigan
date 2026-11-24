@@ -5,6 +5,8 @@ use hdf5_writer::{Hdf5Type, Datatype};
 
 use crate::geometry::{FourVector, StokesVector};
 use super::FieldData;
+#[cfg(feature = "lasy-input")]
+use super::LasyXytField;
 
 /// The polarization of an electromagnetic wave
 #[allow(unused)]
@@ -111,6 +113,10 @@ pub enum FieldStructure {
     Numerical {
         data: FieldData,
     },
+    #[cfg(feature = "lasy-input")]
+    LasyXyt {
+        data: LasyXytField,
+    },
 }
 
 impl FieldStructure {
@@ -118,6 +124,8 @@ impl FieldStructure {
         match self {
             FieldStructure::Analytical { params } => *params,
             FieldStructure::Numerical { data } => data.params(),
+            #[cfg(feature = "lasy-input")]
+            FieldStructure::LasyXyt { data } => data.params(),
         }
     }
 
@@ -125,6 +133,16 @@ impl FieldStructure {
         match self {
             FieldStructure::Analytical { .. } => None,
             FieldStructure::Numerical { data } => Some(data),
+            #[cfg(feature = "lasy-input")]
+            FieldStructure::LasyXyt { .. } => None,
+        }
+    }
+
+    #[cfg(feature = "lasy-input")]
+    pub fn is_lasy_xyt(&self) -> Option<&LasyXytField> {
+        match self {
+            FieldStructure::LasyXyt { data } => Some(data),
+            _ => None,
         }
     }
 }

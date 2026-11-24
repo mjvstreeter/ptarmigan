@@ -13,6 +13,7 @@ fn main() {
             "CARGO_FEATURE_HDF5_OUTPUT" => features.push("hdf5-output"),
             "CARGO_FEATURE_WITH_MPI" => features.push("with-mpi"),
             "CARGO_FEATURE_COMPENSATING_CHIRP" => features.push("compensating-chirp"),
+            "CARGO_FEATURE_LASY_INPUT" => features.push("lasy-input"),
             _ => {}
         }
     }

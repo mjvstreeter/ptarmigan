@@ -12,11 +12,15 @@ mod fast_focused_laser;
 mod plane_wave;
 mod fast_plane_wave;
 mod lcf;
+#[cfg(feature = "lasy-input")]
+mod lasy_xyt;
 
 pub use self::focused_laser::*;
 pub use self::fast_focused_laser::*;
 pub use self::plane_wave::*;
 pub use self::fast_plane_wave::*;
+#[cfg(feature = "lasy-input")]
+pub use self::lasy_xyt::*;
 
 mod numerical;
 pub use self::numerical::*;
@@ -30,6 +34,8 @@ pub enum Laser {
     FastFocusedLaser,
     NumericalPW,
     NumericalFastPW,
+    #[cfg(feature = "lasy-input")]
+    LasyXytField,
 }
 
 /// Represents the electromagnetic field in a spatiotemporal domain.

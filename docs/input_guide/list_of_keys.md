@@ -29,6 +29,7 @@
 | `laser`   | `from_plain text` | `step`           | if `file` specified | numerical | -     | in units of seconds or metres, as appropriate |
 | `laser`   | `from_plain text` | `scale_field_by` | optional            | numerical | `1.0` | |
 | `laser`   | `from_plain text` | `high_pass`      | optional            | numerical | `0.0` | Hz or 1/m, according to units of `step` |
+| `laser`   | `from_lasy_volume` | `file`          | optional            | file path | -     | z-resolved LASY volume; requires `lasy-input` and `control: lcfa: true` |
 ||
 | `beam`    |             | `n`                     | **yes**                          | integer                                     | -                               |                                                                                              |
 | `beam`    |             | `n_real`                | optional                         | numerical                                   | `n`                             | alternative to `charge`                                                                      |

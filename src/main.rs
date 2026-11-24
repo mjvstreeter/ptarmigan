@@ -402,7 +402,39 @@ fn ptarmigan_main<C: Communicator>(world: C) -> Result<(), Box<dyn Error>> {
 
     // Check if we're reading from a file first.
 
-    let fields = if input.read::<String, _>("laser:from_plain_text:file").is_ok() {
+    let fields = if input.contains("laser:from_lasy_volume:file") {
+        #[cfg(not(feature = "lasy-input"))]
+        {
+            report!(Diagnostic::Error, id == 0, "cannot import LASY fields (Ptarmigan not compiled with the lasy-input feature).");
+            return Err(InputError::import("laser:from_lasy_volume:file", "file").into());
+        }
+        #[cfg(feature = "lasy-input")]
+        {
+            if !using_lcfa {
+                report!(Diagnostic::Error, id == 0, "LASY xyt fields require control:lcfa: true.");
+                return Err(InputError::conversion("control:lcfa", "lcfa").into());
+            }
+            let filename: String = input.read("laser:from_lasy_volume:file")?;
+            let filename = format!("{}{}{}", output_dir, if output_dir.is_empty() {""} else {"/"}, filename);
+            if id == 0 {
+                println!("{} LASY field from {}...", "Importing".bold().cyan(), filename.bold().blue());
+            }
+            let data = LasyXytField::from_hdf5(&filename).map_err(|err| {
+                report!(Diagnostic::Error, id == 0, "unable to import LASY field: {}.", err);
+                InputError::import("laser:from_lasy_volume:file", "file")
+            })?;
+            let params = data.params();
+            if id == 0 {
+                println!(
+                    "{} LASY volume, wavelength = {:.2e} m, peak a0 = {:.2e}.",
+                    "Completed".bold().bright_green(),
+                    params.wavelength,
+                    params.a0,
+                );
+            }
+            vec![FieldStructure::LasyXyt { data }]
+        }
+    } else if input.read::<String, _>("laser:from_plain_text:file").is_ok() {
         let filename: String = input.read("laser:from_plain_text:file")?;
         let filename = format!("{}{}{}", output_dir, if output_dir.is_empty() {""} else {"/"}, filename);
 
@@ -1166,30 +1198,35 @@ fn ptarmigan_main<C: Communicator>(world: C) -> Result<(), Box<dyn Error>> {
             rng.jump();
         }
 
-        let laser: Laser = if let Some(data) = field.is_numerical() {
-            if using_lcfa {
-                NumericalFastPW::from(data).into()
+        let laser: Laser = match field {
+            #[cfg(feature = "lasy-input")]
+            FieldStructure::LasyXyt { data } => data.clone().into(),
+            FieldStructure::Numerical { data } => {
+                if using_lcfa {
+                    NumericalFastPW::from(data).into()
+                } else {
+                    NumericalPW::from(data).into()
+                }
+            },
+            FieldStructure::Analytical { .. } => if focusing && !using_lcfa {
+                FocusedLaser::new(a0, wavelength, waist, n_cycles, pol, pol_angle)
+                    .with_envelope(envelope)
+                    .with_finite_bandwidth(finite_bandwidth)
+                    .into()
+            } else if focusing {
+                FastFocusedLaser::new(a0, wavelength, waist, n_cycles, pol, pol_angle)
+                    .with_envelope(envelope)
+                    .into()
+            } else if !using_lcfa {
+                PlaneWave::new(a0, wavelength, n_cycles, pol, pol_angle, chirp_b)
+                    .with_envelope(envelope)
+                    .with_finite_bandwidth(finite_bandwidth)
+                    .into()
             } else {
-                NumericalPW::from(data).into()
-            }
-        } else if focusing && !using_lcfa {
-            FocusedLaser::new(a0, wavelength, waist, n_cycles, pol, pol_angle)
-                .with_envelope(envelope)
-                .with_finite_bandwidth(finite_bandwidth)
-                .into()
-        } else if focusing {
-            FastFocusedLaser::new(a0, wavelength, waist, n_cycles, pol, pol_angle)
-                .with_envelope(envelope)
-                .into()
-        } else if !using_lcfa {
-            PlaneWave::new(a0, wavelength, n_cycles, pol, pol_angle, chirp_b)
-                .with_envelope(envelope)
-                .with_finite_bandwidth(finite_bandwidth)
-                .into()
-        } else {
-            FastPlaneWave::new(a0, wavelength, n_cycles, pol, pol_angle, chirp_b)
-                .with_envelope(envelope)
-                .into()
+                FastPlaneWave::new(a0, wavelength, n_cycles, pol, pol_angle, chirp_b)
+                    .with_envelope(envelope)
+                    .into()
+            },
         };
 
         let primaries = match beam {

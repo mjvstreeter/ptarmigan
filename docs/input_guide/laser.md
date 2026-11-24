@@ -72,3 +72,54 @@ at which the intensity falls to $1/e^2$ of its maximum value.
 If the subsection `from_plain_text` is present, it will be prioritized and the parameters given in [Analytically defined fields](#analytically-defined-fields) will be ignored.
 
 An example of a custom laser pulse may be found in `examples/custom_laser`.
+
+## LASY xyt volumes
+
+PTARMIGAN can read a z-resolved, Cartesian LASY pulse volume when built with
+the `lasy-input` feature. This field uses the locally constant field
+approximation, so set `control: lcfa: true`:
+
+```yaml
+control:
+  lcfa: true
+
+laser:
+  from_lasy_volume:
+    file: lasy-volume.h5
+```
+
+The import reads the carrier angular frequency from the HDF5 metadata and
+computes the wavelength as `2*pi*c/angularFrequency`. The pulse amplitude and
+polarization are also taken from the volume data; analytic laser parameters
+such as `a0`, `wavelength`, and `waist` are not needed.
+
+LASY's standard HDF5 output is an xyt plane, not a z-resolved volume. The
+`tools/lasy_to_ptarmigan.py` helper is intended to be imported from the LASY
+pulse-generation script and writes propagated planes into a PTARMIGAN-specific
+volume:
+
+```python
+from tools.lasy_to_ptarmigan import write_ptarmigan_volume
+
+write_ptarmigan_volume(laser, z_positions, "lasy-volume.h5")
+```
+
+`z_positions` must be a strictly increasing array in metres. The resulting
+file contains `/ptarmigan_lasy/{x,y,z,t,a_envelope}`. The axes are uniformly
+spaced, in metres except for `t` (seconds). `a_envelope` has shape
+`[nz, ny, nx, nt, 6]`, with components
+`Ax.re, Ax.im, Ay.re, Ay.im, Az.re, Az.im`; the vector potential is normalized
+as `e*A/(m_e*c)`, and `t` is LASY's retarded-time coordinate. LASY's carrier
+frequency and polarization are stored as group attributes. The helper forms
+the small longitudinal-potential component using the paraxial condition
+`div(A)=0`; fields are reconstructed from the potential by finite differences.
+
+This is a numerical volume model: enough z planes and adequate spatial and
+temporal resolution are required. The field backend uses multilinear
+interpolation in space and time, and the simulation timestep is limited by the
+smallest grid spacing. Build with `--features lasy-input`; this requires a
+system HDF5 library. For example:
+
+```bash
+cargo build --release --features lasy-input
+```
