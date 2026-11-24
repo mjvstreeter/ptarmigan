@@ -1,0 +1,28 @@
+---
+# Simulate an electron beam colliding head-on with a LASY-generated laser pulse.
+# First create examples/lasy-volume.h5 with tools/lasy_to_ptarmigan.py.
+# Build with `cargo build --release --features lasy-input`, then run:
+# `cargo run --release --features lasy-input -- examples/lasy_volume.yml`
+
+control:
+  dt_multiplier: 0.5
+  lcfa: true
+  radiation_reaction: true
+  pair_creation: false
+
+laser:
+  from_lasy_volume:
+    file: lasy-volume.h5
+
+beam:
+  n: 10000
+  species: electron
+  charge: e
+  gamma: 1000 * MeV / (m * c^2)
+
+output:
+  ident: lasy-volume
+  file_format: fits
+  photon:
+    - energy:(energy)
+    - angle_x:angle_y:(auto; auto; angle in auto, 10 * milli)
