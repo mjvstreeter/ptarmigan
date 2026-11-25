@@ -2027,7 +2027,14 @@ fn main() -> ExitCode {
 
     let base = if cfg!(target_os = "windows") { "*" } else { "═" };
     let bar = base.repeat(36);
-    let title = concat!(" ", "Ptarmigan v", env!("CARGO_PKG_VERSION"), " ");
+    let sha = env!("VERGEN_GIT_SHA");
+    let short_sha = sha.get(..7).unwrap_or(sha);
+    let title = format!(
+        " Ptarmigan v{} ({} {}) ",
+        env!("CARGO_PKG_VERSION"),
+        env!("VERGEN_GIT_BRANCH"),
+        short_sha,
+    );
 
     if id == 0 {
         println!("{}{}{}", bar.blue(), title.bold(), bar.blue());
