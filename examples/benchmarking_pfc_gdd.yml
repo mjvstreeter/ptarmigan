@@ -11,17 +11,17 @@ laser:
   a0: 2.5
   omega: omega * eV
   envelope: gaussian
-  fwhm_duration: 16.0 * wavelength / c
+  fwhm_duration: 30e-15
   focus_model: spectral
-  f_number: 7.0
-  gdd: 500.0e-30
+  f_number: 5.0
+  gdd: 18000.0e-30
   lca: -3.4e-18
-  n_freq: 129
-  n_sigma: 4.5
+  n_freq: 1024
+  n_sigma: 5.0
   polarization: linear
 
 beam:
-  ne: 1000000
+  ne: 10000
   charge: e
   gamma: eta * 0.510999 / (2.0 * omega * 1.0e-6)
 
