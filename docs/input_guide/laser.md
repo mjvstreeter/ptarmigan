@@ -41,6 +41,34 @@ at which the intensity falls to $1/e^2$ of its maximum value. Otherwise the lase
 * `n_cycles` (if `envelope: cos^2` or `flattop`): the total duration of the pulse, expressed in wavelengths. Usually (but not required to be) an integer.
 * `chirp_coeff` (optional, ignored if `waist` is specified): specifies `b`, the chirp coefficient, which appears in the total phase `ϕ + b ϕ^2` of the laser carrier wave. A positive `b` leads to an instantaneous frequency that increases linearly from head to tail.
 
+### Spectral focused pulse with pulse-front curvature
+
+For a linearly polarized, paraxial focused pulse with group-delay dispersion
+(GDD) and longitudinal chromatic aberration (LCA), set `focus_model: spectral`.
+This option constructs the normalized vector potential from a discrete Gaussian
+frequency spectrum and calculates the electric and magnetic fields from its
+analytic spacetime gradient. It requires `envelope: gaussian` (the default for
+a focused pulse) and `fwhm_duration`.
+
+* `f_number` (required): focusing f-number. The central-frequency waist is
+  $w_0 = 2 \lambda N / \pi$; `beam_fill` scales the effective f-number by
+  $1/\mathrm{beam\_fill}$.
+* `gdd` (optional, default `0.0`): group-delay dispersion in seconds squared.
+* `lca` (optional, default `0.0`): focus shift per angular-frequency offset,
+  $d z_f/d\omega$, in metres times seconds. Positive values shift the focus
+  toward positive z for higher frequencies.
+* `beam_fill` (optional, default `1.0`): ratio of the beam diameter on the
+  focusing optic to its aperture.
+* `n_freq` (optional, default `129`): number of samples in the frequency sum.
+* `n_sigma` (optional, default `4.5`): half-width of the frequency sum in
+  Gaussian spectral standard deviations.
+
+The spectral model currently supports linear polarization only. Its `a0` is
+the peak normalized potential at focus when GDD and LCA are zero. Keep the
+frequency-grid periodicity sufficiently longer than the chirped pulse duration;
+increasing `n_freq` increases that period without changing the sampled bandwidth.
+The model is paraxial and is intended for f-numbers of roughly 3 or larger.
+
 ## Numerically defined fields
 
 In order to read in a pulse from a plain-text file, create a subsection called `from_plain_text` under `laser` and specify:

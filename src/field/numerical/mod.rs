@@ -248,7 +248,8 @@ impl FieldData {
             envelope: Envelope::Gaussian,
             waist,
             n_cycles,
-            chirp_b: 0.0
+            chirp_b: 0.0,
+            spectral: None,
         };
 
         Ok(Self {

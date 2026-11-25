@@ -140,4 +140,15 @@ pub struct LaserParameters {
     pub envelope: Envelope,
     pub n_cycles: f64,
     pub chirp_b: f64,
+    pub spectral: Option<SpectralPulseParameters>,
+}
+
+#[derive(Copy, Clone)]
+pub struct SpectralPulseParameters {
+    pub f_number: f64,
+    pub gdd: f64,
+    pub lca: f64,
+    pub beam_fill: f64,
+    pub n_freq: usize,
+    pub n_sigma: f64,
 }

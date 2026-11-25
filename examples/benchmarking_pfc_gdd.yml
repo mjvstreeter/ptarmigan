@@ -1,0 +1,41 @@
+---
+# Benchmark setup with a focused Gaussian spectrum, group-delay dispersion,
+# and longitudinal chromatic aberration.
+
+control:
+  dt_multiplier: 0.5
+  radiation_reaction: false
+  pair_creation: false
+
+laser:
+  a0: 2.5
+  omega: omega * eV
+  envelope: gaussian
+  fwhm_duration: 16.0 * wavelength / c
+  focus_model: spectral
+  f_number: 7.0
+  gdd: 500.0e-30
+  lca: -3.4e-18
+  n_freq: 129
+  n_sigma: 4.5
+  polarization: linear
+
+beam:
+  ne: 1000000
+  charge: e
+  gamma: eta * 0.510999 / (2.0 * omega * 1.0e-6)
+
+output:
+  ident: 2.5x0.1_pfc_gdd
+  file_format: fits
+  photon:
+    - p^-:(pol_x)
+    - p^-:(pol_y)
+    - r_x:r_y:(auto; pol_x; theta in 0, max_theta)
+    - r_x:r_y:(auto; pol_y; theta in 0, max_theta)
+
+constants:
+  eta: 0.1
+  omega: 1.5498
+  max_theta: 0.4 * milli
+  wavelength: 0.8 * micro

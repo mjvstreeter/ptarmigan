@@ -524,13 +524,98 @@ fn ptarmigan_main<C: Communicator>(world: C) -> Result<(), Box<dyn Error>> {
             })
             ?;
 
-        let (focusing, waist) = input
+        let use_spectral_model = input.read::<String, _>("laser:focus_model")
+            .and_then(|s| if s == "spectral" {
+                Ok(true)
+            } else {
+                report!(Diagnostic::Error, id == 0, "laser focus_model must be 'spectral'.");
+                Err(InputError::conversion("laser:focus_model", "focus_model"))
+            })
+            .or_else(|e| match e.kind() {
+                InputErrorKind::Location => Ok(false),
+                _ => Err(e),
+            })?;
+
+        let spectral = if use_spectral_model {
+            if pol != Polarization::Linear {
+                report!(Diagnostic::Error, id == 0, "the spectral focused pulse currently requires linear polarization.");
+                return Err(InputError::conversion("laser:polarization", "polarization").into());
+            }
+
+            let f_number: f64 = input.read("laser:f_number")?;
+            let gdd = input.read("laser:gdd")
+                .or_else(|e| match e.kind() {
+                    InputErrorKind::Location => Ok(0.0),
+                    _ => Err(e),
+                })?;
+            let lca = input.read("laser:lca")
+                .or_else(|e| match e.kind() {
+                    InputErrorKind::Location => Ok(0.0),
+                    _ => Err(e),
+                })?;
+            let beam_fill = input.read("laser:beam_fill")
+                .or_else(|e| match e.kind() {
+                    InputErrorKind::Location => Ok(1.0),
+                    _ => Err(e),
+                })?;
+            let n_freq: i64 = input.read("laser:n_freq")
+                .or_else(|e| match e.kind() {
+                    InputErrorKind::Location => Ok(129),
+                    _ => Err(e),
+                })?;
+            let n_sigma = input.read("laser:n_sigma")
+                .or_else(|e| match e.kind() {
+                    InputErrorKind::Location => Ok(4.5),
+                    _ => Err(e),
+                })?;
+
+            if !f_number.is_finite()
+                || !gdd.is_finite()
+                || !lca.is_finite()
+                || !beam_fill.is_finite()
+                || !n_sigma.is_finite()
+                || f_number <= 0.0
+                || beam_fill <= 0.0
+                || n_sigma <= 0.0
+                || n_freq < 2
+            {
+                report!(Diagnostic::Error, id == 0, "spectral pulse parameters must be finite, with f_number, beam_fill and n_sigma positive and n_freq >= 2.");
+                return Err(InputError::conversion("laser:focus_model", "spectral parameters").into());
+            }
+
+            Some(SpectralPulseParameters {
+                f_number,
+                gdd,
+                lca,
+                beam_fill,
+                n_freq: n_freq as usize,
+                n_sigma,
+            })
+        } else {
+            None
+        };
+
+        let input_waist = input
             .read("laser:waist")
-            .map(|w| (true, w))
+            .map(Some)
             .or_else(|e| match e.kind() {
                 InputErrorKind::Conversion => Err(e),
-                _ => Ok((false, std::f64::INFINITY)),
+                InputErrorKind::Location => Ok(None),
+                _ => Err(e),
             })?;
+        if spectral.is_some() && input_waist.is_some() {
+            report!(Diagnostic::Error, id == 0, "laser:waist cannot be combined with laser:focus_model: spectral; specify f_number instead.");
+            return Err(InputError::conversion("laser:waist", "waist").into());
+        }
+        let (focusing, waist) = match spectral {
+            Some(params) => (
+                true,
+                2.0 * wavelength * params.f_number / (consts::PI * params.beam_fill),
+            ),
+            None => input_waist
+                .map(|w| (true, w))
+                .unwrap_or((false, std::f64::INFINITY)),
+        };
 
         let envelope = input.read::<String, _>("laser:envelope")
             .and_then(|s| match s.as_str() {
@@ -543,6 +628,10 @@ fn ptarmigan_main<C: Communicator>(world: C) -> Result<(), Box<dyn Error>> {
                 }
             })
             .unwrap_or_else(|_| if focusing {Envelope::Gaussian} else {Envelope::CosSquared});
+        if spectral.is_some() && envelope != Envelope::Gaussian {
+            report!(Diagnostic::Error, id == 0, "the spectral focused pulse requires envelope: gaussian.");
+            return Err(InputError::conversion("laser:envelope", "envelope").into());
+        }
 
         let n_cycles: f64 = match envelope {
             Envelope::CosSquared => input.read("laser:n_cycles")?,
@@ -556,11 +645,33 @@ fn ptarmigan_main<C: Communicator>(world: C) -> Result<(), Box<dyn Error>> {
                     })?
             },
             Envelope::Gaussian => {
-                input.read("laser:fwhm_duration")
-                    .map(|t: f64| SPEED_OF_LIGHT * t / wavelength)
-                    .or_else(|_e| input.read("laser:n_cycles"))?
+                if spectral.is_some() {
+                    input.read::<f64, _>("laser:fwhm_duration")
+                        .map(|t| SPEED_OF_LIGHT * t / wavelength)?
+                } else {
+                    input.read("laser:fwhm_duration")
+                        .map(|t: f64| SPEED_OF_LIGHT * t / wavelength)
+                        .or_else(|_e| input.read("laser:n_cycles"))?
+                }
             }
         };
+
+        if let Some(params) = spectral {
+            let duration = n_cycles * wavelength / SPEED_OF_LIGHT;
+            let omega = 2.0 * consts::PI * SPEED_OF_LIGHT / wavelength;
+            let sigma = 2.0 * consts::LN_2.sqrt() / duration;
+            let tau_out = duration
+                * (1.0 + (4.0 * consts::LN_2 * params.gdd / duration.powi(2)).powi(2)).sqrt();
+            if !duration.is_finite()
+                || !sigma.is_finite()
+                || !tau_out.is_finite()
+                || duration <= 0.0
+                || omega - params.n_sigma * sigma <= 0.0
+            {
+                report!(Diagnostic::Error, id == 0, "spectral pulse duration and frequency bandwidth must be finite and positive.");
+                return Err(InputError::conversion("laser:fwhm_duration", "fwhm_duration").into());
+            }
+        }
 
         let chirp_b = if !focusing {
             input.read("laser:chirp_coeff").unwrap_or(0.0)
@@ -577,7 +688,8 @@ fn ptarmigan_main<C: Communicator>(world: C) -> Result<(), Box<dyn Error>> {
             .iter()
             .map(|a0| {
                 let params = LaserParameters {
-                    a0: *a0, wavelength, pol, pol_angle, focusing, waist, envelope, n_cycles, chirp_b
+                    a0: *a0, wavelength, pol, pol_angle, focusing, waist, envelope, n_cycles, chirp_b,
+                    spectral,
                 };
                 FieldStructure::Analytical { params }
             })
@@ -1122,6 +1234,7 @@ fn ptarmigan_main<C: Communicator>(world: C) -> Result<(), Box<dyn Error>> {
                 envelope,
                 n_cycles,
                 chirp_b,
+                spectral,
             } = field.params();
 
         // Rare event sampling for pair creation
@@ -1172,6 +1285,20 @@ fn ptarmigan_main<C: Communicator>(world: C) -> Result<(), Box<dyn Error>> {
             } else {
                 NumericalPW::from(data).into()
             }
+        } else if let Some(spectral) = spectral {
+            SpectralFocusedLaser::new(
+                a0,
+                wavelength,
+                n_cycles * wavelength / SPEED_OF_LIGHT,
+                spectral.f_number,
+                spectral.gdd,
+                spectral.lca,
+                spectral.beam_fill,
+                spectral.n_freq,
+                spectral.n_sigma,
+                pol_angle,
+            )
+            .into()
         } else if focusing && !using_lcfa {
             FocusedLaser::new(a0, wavelength, waist, n_cycles, pol, pol_angle)
                 .with_envelope(envelope)

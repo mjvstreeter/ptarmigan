@@ -9,12 +9,14 @@ pub use properties::*;
 
 mod focused_laser;
 mod fast_focused_laser;
+mod spectral_focused_laser;
 mod plane_wave;
 mod fast_plane_wave;
 mod lcf;
 
 pub use self::focused_laser::*;
 pub use self::fast_focused_laser::*;
+pub use self::spectral_focused_laser::*;
 pub use self::plane_wave::*;
 pub use self::fast_plane_wave::*;
 
@@ -28,6 +30,7 @@ pub enum Laser {
     FastPlaneWave,
     FocusedLaser,
     FastFocusedLaser,
+    SpectralFocusedLaser,
     NumericalPW,
     NumericalFastPW,
 }
